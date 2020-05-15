@@ -341,10 +341,7 @@ class GDALInfoEGEOSValidOperator(BaseOperator):
             return_message = None
             tif_compression = 'No compression'
             for lines in gdalinfo_output.decode().split("\n"):
-                if lines.startswith("ERROR") or "no valid pixels found in sampling" in lines:
-                    return_message = '[no valid pixels found in sampling]'
-                    break
-                elif len(lines.split(' ')) > 1 and lines.split(" ")[0] + ' ' + lines.split(' ')[1] == 'Size is':
+                if len(lines.split(' ')) > 1 and lines.split(" ")[0] + ' ' + lines.split(' ')[1] == 'Size is':
                     tif_file_size = [int((lines.split(" ")[2]).split(',')[0]), int(lines.split(" ")[3])]
                     if not (4000 <= tif_file_size[0] <= 4002 or 4000 <= tif_file_size[1] <= 4002):
                         return_message = '[incorrect image size {} {}]'.format(tif_file_size[0], tif_file_size[1])
@@ -359,6 +356,21 @@ class GDALInfoEGEOSValidOperator(BaseOperator):
                     tif_compression = lines.split('=')[1]
                     if tif_compression != 'DEFLATE':
                         return_message = '[incorrect Compression type {}]'.format(tif_compression)
+                        break
+                elif len(lines.split(' ')) > 1 and lines.split("=")[0] == '    STATISTICS_MAXIMUM':
+                    tif_MAX_Stats = int((lines.split('=')[1]))
+                    if tif_MAX_Stats < 1000 or tif_MAX_Stats > 12000:
+                        return_message = '[incorrect STATISTICS_MAXIMUM {}]'.format(tif_MAX_Stats)
+                        break
+                elif len(lines.split(' ')) > 1 and lines.split("=")[0] == '    STATISTICS_MINIMUM':
+                    tif_MIN_Stats = int((lines.split('=')[1]))
+                    if tif_MIN_Stats < -12000 or tif_MIN_Stats > 1000:
+                        return_message = '[incorrect STATISTICS_MINIMUM {}]'.format(tif_MIN_Stats)
+                        break
+                elif len(lines.split(' ')) > 1 and lines.split("=")[0] == '    STATISTICS_VALID_PERCENT':
+                    tif_valid_perc = float((lines.split('=')[1]))
+                    if tif_valid_perc <= 2:
+                        return_message = '[incorrect STATISTICS_VALID_PERCENT {}]'.format(tif_valid_perc)
                         break
                 elif len(lines.split(' ')) > 1 and lines[:14] == '  NoData Value':
                     tif_no_data = lines.split(' ')[3][6:]
