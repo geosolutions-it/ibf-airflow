@@ -10,7 +10,7 @@ from functools import partial
 
 import six
 from airflow.models import XCOM_RETURN_KEY
-from airflow.operators import BaseOperator
+from airflow.models import BaseOperator, SkipMixin, TaskReschedule
 from airflow.operators import BashOperator
 from airflow.plugins_manager import AirflowPlugin
 from airflow.utils.decorators import apply_defaults
@@ -26,7 +26,7 @@ import config.xcom_keys as xk
 log = logging.getLogger(__name__)
 
 
-class ZipInspector(BaseOperator):
+class ZipInspector(BaseOperator, SkipMixin):
     """ ZipInspector takes list of downloaded products and goes through the downloaded product's zipfiles and searches for a defined extension (.tiff)  
 
     Args:
@@ -44,6 +44,12 @@ class ZipInspector(BaseOperator):
         log.info('--------------------ZipinspectorOperator------------')
         super(ZipInspector, self).__init__(*args, **kwargs)
 
+    def _do_skip_downstream_tasks(self, context):
+        downstream_tasks = context['task'].get_flat_relatives(upstream=False)
+        log.debug("Downstream task_ids %s", downstream_tasks)
+        if downstream_tasks:
+            self.skip(context['dag_run'], context['ti'].execution_date, downstream_tasks)
+
     def execute(self, context):
         zip_files = list()
         if self.get_inputs_from != None:
@@ -60,7 +66,7 @@ class ZipInspector(BaseOperator):
         # stop processing if there are no products
         if zip_files is None or len(zip_files) == 0:
             log.info("Nothing to process.")
-            return
+            self._do_skip_downstream_tasks(context)
 
         return_dict = dict()
         log.info("Processing {} ZIP files:\n{} ".format(len(zip_files), pprint.pformat(zip_files)))
@@ -79,11 +85,10 @@ class ZipInspector(BaseOperator):
                     context['task_instance'].xcom_push(key=xk.IMAGE_ZIP_ABS_PATH_PREFIX_XCOM_KEY + str(counter),
                                                        value=raster_vsizip)
             return_dict[zip_file] = vsi_paths
-
         return return_dict
 
 
-class RSYNCOperator(BaseOperator):
+class RSYNCOperator(BaseOperator, SkipMixin):
     """ RSYNCOperator is using rsync command line to upload files remotely using ssh keys
 
     Args:
@@ -114,6 +119,12 @@ class RSYNCOperator(BaseOperator):
         log.info('--------------------RSYNCOperator ------------')
         super(RSYNCOperator, self).__init__(*args, **kwargs)
 
+    def _do_skip_downstream_tasks(self, context):
+        downstream_tasks = context['task'].get_flat_relatives(upstream=False)
+        log.debug("Downstream task_ids %s", downstream_tasks)
+        if downstream_tasks:
+            self.skip(context['dag_run'], context['ti'].execution_date, downstream_tasks)
+
     def execute(self, context):
         log.info(context)
         log.info("###########")
@@ -130,7 +141,7 @@ class RSYNCOperator(BaseOperator):
         # stop processing if there are no products
         if files is None:
             log.info("Nothing to process.")
-            return
+            self._do_skip_downstream_tasks(context)
 
         if isinstance(files, six.string_types):
             files_str = files
@@ -146,11 +157,13 @@ class RSYNCOperator(BaseOperator):
         # construct list of filenames uploaded to remote host
         files_list = files_str.split()
         filenames_list = list(os.path.join(self.remote_dir, os.path.basename(path)) for path in files_list)
-        log.info("Uploaded files: {}".format(pprint.pformat(files_list)))
-        return filenames_list
+        if filenames_list and len(filenames_list) > 0:
+            log.info("Uploaded files: {}".format(pprint.pformat(files_list)))
+            return filenames_list
+        self._do_skip_downstream_tasks(context)
 
 
-class MoveFilesOperator(BaseOperator):
+class MoveFilesOperator(BaseOperator, SkipMixin):
     """ MoveFilesOperator is moving files according to a filter to be applied on the file's names
 
     Args:
@@ -172,6 +185,12 @@ class MoveFilesOperator(BaseOperator):
         self.regex = regex
         log.info('--------------------MoveFilesOperator------------')
 
+    def _do_skip_downstream_tasks(self, context):
+        downstream_tasks = context['task'].get_flat_relatives(upstream=False)
+        log.debug("Downstream task_ids %s", downstream_tasks)
+        if downstream_tasks:
+            self.skip(context['dag_run'], context['ti'].execution_date, downstream_tasks)
+
     def execute(self, context):
         log.info(
             '\nsrc_dir={}\ndst_dir={}\nfilename_filter={}'.format(self.src_dir, self.dst_dir, self.filename_filter))
@@ -179,11 +198,11 @@ class MoveFilesOperator(BaseOperator):
 
         if filenames is None or len(filenames) == 0:
             log.info("No files to move.")
-            return
+            self._do_skip_downstream_tasks(context)
 
         if not os.path.exists(self.dst_dir):
             log.info("Destination folder does not exist.")
-            return
+            self._do_skip_downstream_tasks(context)
 
         filenames_list = []
         for filename in filenames:
@@ -233,12 +252,15 @@ class MoveFilesOperator(BaseOperator):
                     os.remove(_org_file)
             except Exception as e:
                 log.exception(e)
+                self._do_skip_downstream_tasks(context)
 
-        log.info(filenames_list)
-        return filenames_list
+        if filenames_list and len(filenames_list) > 0:
+            log.info(filenames_list)
+            return filenames_list
+        self._do_skip_downstream_tasks(context)
 
 
-class SearchFilesOperator(BaseOperator):
+class SearchFilesOperator(BaseOperator, SkipMixin):
     """ MoveFilesOperator is moving files according to a filter to be applied on the file's names
 
     Args:
@@ -260,13 +282,19 @@ class SearchFilesOperator(BaseOperator):
         self.filename_filter = filename_filter
         log.info('--------------------SearchFilesOperator-----------')
 
+    def _do_skip_downstream_tasks(self, context):
+        downstream_tasks = context['task'].get_flat_relatives(upstream=False)
+        log.debug("Downstream task_ids %s", downstream_tasks)
+        if downstream_tasks:
+            self.skip(context['dag_run'], context['ti'].execution_date, downstream_tasks)
+
     def execute(self, context):
         log.info('\nsrc_dir={}\nfilter={}'.format(self.src_dir, self.filename_filter))
         filenames = fnmatch.filter(os.listdir(self.src_dir), self.filename_filter)
 
         if filenames is None or len(filenames) == 0:
             log.info("No files to move.")
-            return 'stop_task'
+            self._do_skip_downstream_tasks(context)
 
         def md5sum(filename):
             with open(filename, mode='rb') as f:
@@ -293,12 +321,12 @@ class SearchFilesOperator(BaseOperator):
                             os.rename(_md5_file, dst_filename)
                 except Exception as e:
                     log.exception(e)
-                    return 'stop_task'
+                    self._do_skip_downstream_tasks(context)
 
         if filenames_list and len(filenames_list) > 0:
             log.info(filenames_list)
             return filenames_list
-        return 'stop_task'
+        self._do_skip_downstream_tasks(context)
 
 
 class FilesPlugin(AirflowPlugin):
