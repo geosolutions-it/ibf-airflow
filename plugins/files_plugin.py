@@ -266,7 +266,7 @@ class SearchFilesOperator(BaseOperator):
 
         if filenames is None or len(filenames) == 0:
             log.info("No files to move.")
-            return
+            return 'stop_task'
 
         def md5sum(filename):
             with open(filename, mode='rb') as f:
