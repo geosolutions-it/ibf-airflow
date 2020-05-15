@@ -1,6 +1,6 @@
 import logging
 import os
-from subprocess import check_output
+from subprocess import check_output, STDOUT, CalledProcessError
 
 import six
 from airflow.models import XCOM_RETURN_KEY
@@ -122,7 +122,14 @@ class GDALWarpOperator(BaseOperator):
                     dstfile
             )
             log.info('The complete GDAL warp command is: %s', gdalwarp_command)
-            bo = BashOperator(task_id="bash_operator_warp", bash_command=gdalwarp_command)
+            env = {
+                'LD_LIBRARY_PATH': '/usr/local/lib:$LD_LIBRARY_PATH'
+            }
+            bo = BashOperator(
+                task_id="bash_operator_warp",
+                env=env,
+                bash_command=gdalwarp_command
+            )
             bo.execute(context)
             output_paths.append(dstfile)
 
@@ -169,9 +176,13 @@ class GDALAddoOperator(BaseOperator):
             )
             output_path = input_path
             output_paths.append(output_path)
+            env = {
+                'LD_LIBRARY_PATH': '/usr/local/lib:$LD_LIBRARY_PATH'
+            }
             bo = BashOperator(
                 task_id='bash_operator_addo_{}'.format(
                     os.path.basename(input_path)),
+                env=env,
                 bash_command=command
             )
             bo.execute(context)
@@ -243,8 +254,12 @@ class GDALTranslateOperator(BaseOperator):
             )
 
             log.info("The complete GDAL translate command is: {}".format(command))
+            env = {
+                'LD_LIBRARY_PATH': '/usr/local/lib:$LD_LIBRARY_PATH'
+            }
             b_o = BashOperator(
                 task_id="bash_operator_translate",
+                env=env,
                 bash_command=command
             )
             b_o.execute(context)
@@ -280,9 +295,16 @@ class GDALInfoOperator(BaseOperator):
             command = ["gdalinfo"]
             log.info("Running GDALInfo on {}...".format(input_path))
             command.append(input_path)
-            gdalinfo_output = check_output(command)
-            log.info("{}".format(gdalinfo_output))
-            gdalinfo_outputs[input_path] = gdalinfo_output
+            try:
+                env = {
+                    'LD_LIBRARY_PATH': '/usr/local/lib:$LD_LIBRARY_PATH'
+                }
+                gdalinfo_output = check_output(' '.join(command), env=env, shell=True, stderr=STDOUT)
+                log.info("{}".format(gdalinfo_output))
+                gdalinfo_outputs[input_path] = gdalinfo_output
+            except CalledProcessError as e:
+                raise RuntimeError(
+                    "command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
 
         return gdalinfo_outputs
 
@@ -336,8 +358,15 @@ class GDALInfoEGEOSValidOperator(BaseOperator):
             command = ["gdalinfo", "-stats"]
             log.info("Running GDALInfo on {}...".format(input_path))
             command.append(input_path)
-            gdalinfo_output = check_output(command)
-            log.info("{}".format(gdalinfo_output.decode()))
+            try:
+                env = {
+                    'LD_LIBRARY_PATH': '/usr/local/lib:$LD_LIBRARY_PATH'
+                }
+                gdalinfo_output = check_output(' '.join(command), env=env, shell=True, stderr=STDOUT)
+                log.info("{}".format(gdalinfo_output.decode()))
+            except CalledProcessError as e:
+                raise RuntimeError(
+                    "command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
             return_message = None
             tif_compression = 'No compression'
             for lines in gdalinfo_output.decode().split("\n"):
