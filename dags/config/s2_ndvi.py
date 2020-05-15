@@ -14,7 +14,7 @@ platformname = 'Sentinel-2 NDVI'
 src_dir = '/home/nfs_sat_data/satfarming/sentinel2/it/master_test/_input_EGEOS_NDVI_test'
 dst_dir = '/home/nfs_sat_data/satfarming/sentinel2/it/master_test/NDVI_test'
 wrg_dir = '/home/nfs_sat_data/satfarming/sentinel2/it/master_test/wrong_EGEOS_satellite_data'
-filename_filter = '*.tif'
+filename_filter = '*.[Tt][Ii][Ff]?'
 regex = r'.*\_([a-zA-Z0-9]{6})\_.*'
 
 #
