@@ -266,7 +266,7 @@ class SearchFilesOperator(BaseOperator):
 
         if filenames is None or len(filenames) == 0:
             log.info("No files to move.")
-            return
+            return 'stop_task'
 
         def md5sum(filename):
             with open(filename, mode='rb') as f:
@@ -293,8 +293,12 @@ class SearchFilesOperator(BaseOperator):
                             os.rename(_md5_file, dst_filename)
                 except Exception as e:
                     log.exception(e)
-        log.info(filenames_list)
-        return filenames_list
+                    return 'stop_task'
+
+        if filenames_list and len(filenames_list) > 0:
+            log.info(filenames_list)
+            return filenames_list
+        return 'stop_task'
 
 
 class FilesPlugin(AirflowPlugin):
