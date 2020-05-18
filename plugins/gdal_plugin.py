@@ -398,7 +398,7 @@ class GDALInfoEGEOSValidOperator(BaseOperator):
                         break
                 elif len(lines.split(' ')) > 1 and lines.split("=")[0] == '    STATISTICS_VALID_PERCENT':
                     tif_valid_perc = float((lines.split('=')[1]))
-                    if tif_valid_perc <= 2:
+                    if tif_valid_perc <= 20:
                         return_message = '[incorrect STATISTICS_VALID_PERCENT {}]'.format(tif_valid_perc)
                         break
                 elif len(lines.split(' ')) > 1 and lines[:14] == '  NoData Value':
