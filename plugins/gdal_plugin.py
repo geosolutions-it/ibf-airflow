@@ -387,12 +387,12 @@ class GDALInfoEGEOSValidOperator(BaseOperator):
                         return_message = '[incorrect Compression type {}]'.format(tif_compression)
                         break
                 elif len(lines.split(' ')) > 1 and lines.split("=")[0] == '    STATISTICS_MAXIMUM':
-                    tif_MAX_Stats = int((lines.split('=')[1]))
+                    tif_MAX_Stats = float((lines.split('=')[1]))
                     if tif_MAX_Stats < 1000 or tif_MAX_Stats > 12000:
                         return_message = '[incorrect STATISTICS_MAXIMUM {}]'.format(tif_MAX_Stats)
                         break
                 elif len(lines.split(' ')) > 1 and lines.split("=")[0] == '    STATISTICS_MINIMUM':
-                    tif_MIN_Stats = int((lines.split('=')[1]))
+                    tif_MIN_Stats = float((lines.split('=')[1]))
                     if tif_MIN_Stats < -12000 or tif_MIN_Stats > 1000:
                         return_message = '[incorrect STATISTICS_MINIMUM {}]'.format(tif_MIN_Stats)
                         break
