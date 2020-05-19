@@ -239,7 +239,11 @@ class MoveFilesOperator(BaseOperator, SkipMixin):
                     _aux_file = os.path.join(self.src_dir, ''.join([_base_name, _ext]))
                     log.info("Checking {} ...".format(_aux_file))
                     if os.path.exists(_aux_file):
-                        _dst_aux_filename = os.path.join(_dst_dir, os.path.basename(_aux_file))
+                        if _ext == '.md5':
+                            _dst_aux_file = ''.join([os.path.splitext(_aux_file)[0], ".md5_processed"])
+                            _dst_aux_filename = os.path.join(_dst_dir, os.path.basename(_dst_aux_file))
+                        else:
+                            _dst_aux_filename = os.path.join(_dst_dir, os.path.basename(_aux_file))
                         log.info("Moving {} to {}".format(_aux_file, _dst_aux_filename))
                         os.rename(_aux_file, _dst_aux_filename)
             except Exception as e:
@@ -317,8 +321,8 @@ class SearchFilesOperator(BaseOperator, SkipMixin):
                         if s.find(_md5.encode('utf8')) != -1:
                             log.info("Found file {} with md5 {}".format(filename, _md5))
                             filenames_list.append(filename)
-                            dst_filename = ''.join([os.path.splitext(_md5_file)[0], ".md5_processed"])
-                            os.rename(_md5_file, dst_filename)
+                            # dst_filename = ''.join([os.path.splitext(_md5_file)[0], ".md5_processed"])
+                            # os.rename(_md5_file, dst_filename)
                 except Exception as e:
                     log.exception(e)
                     self._do_skip_downstream_tasks(context)
